@@ -1,0 +1,118 @@
+name: Build, Publish, and Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  infer-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.nyx.outputs.version }}
+
+    steps:
+      - name: "✅ Checkout code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "🤑 Cache Nyx state"
+        uses: actions/cache@v3
+        with:
+          path: .nyx-state.json
+          key: ${{ runner.os }}-nyx-state
+          restore-keys: ${{ runner.os }}-nyx-state
+
+      - name: "🤔 Infer release with Nyx, make changelog"
+        id: nyx
+        uses: mooltiverse/nyx-github-action@main
+        env:
+          NYX_VERBOSITY: 'WARN'
+        with:
+          configurationFile: 'build-configuration/.nyx.json'
+          command: 'make'
+          stateFile: .nyx-state.json
+          changelogPath: CHANGELOG.md
+
+      - name: "🟢 Release version is ${{ steps.nyx.outputs.version }}"
+        run: echo The release version is ${{ steps.nyx.outputs.version }}
+
+      - name: "✍️ Create Git Tag"
+        run: |
+          git tag ${{ steps.nyx.outputs.version }}
+          git push origin ${{ steps.nyx.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "📖 Read Changelog for Release Notes"
+        id: changelog
+        run: |
+          # Extract the latest changelog entry (assuming a standard Markdown format)
+          awk '/^## / {found++} found == 1 {print}' CHANGELOG.md > latest-changelog.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "🌊 Create GitHub Release"
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          tag: ${{ steps.nyx.outputs.version }}
+          name: Release ${{ steps.nyx.outputs.version }}
+          bodyFile: latest-changelog.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "⚙️ Set up JDK 21"
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          
+      - name: "⚙️ Setup Gradle"
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.9
+
+      - name: "🎁 Build artifacts"
+        run: ./gradlew build
+        env:
+          VERSION: ${{ steps.nyx.outputs.version }}
+          
+      - name: "📤 Upload build artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: "**/build/**/*.jar"
+
+  build-and-publish:
+    runs-on: self-hosted
+    needs: infer-release
+
+    steps:
+      - name: "✅ Checkout code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: "📥 Download build artifacts"
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+
+      - name: "⚙️ Set up JDK 21"
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: "⚙️ Setup Gradle"
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.9
+
+      - name: "🌎 Publish with Gradle"
+        run: ./gradlew publish -Pversion=$VERSION --build-cache --daemon --parallel --scan
+        env:
+          VERSION: ${{ needs.infer-release.outputs.version }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
