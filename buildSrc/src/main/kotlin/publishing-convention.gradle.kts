@@ -1,38 +1,68 @@
+import com.vanniktech.maven.publish.JavadocJar
+import com.vanniktech.maven.publish.KotlinMultiplatform
+import com.vanniktech.maven.publish.SonatypeHost
 import org.gradle.kotlin.dsl.*
 import java.util.Properties
 
 plugins {
-    `maven-publish`
+    id("com.vanniktech.maven.publish")
+    signing
 }
 
-publishing {
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/schott12521/TODO CHANGE")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
+// Load publish properties (for your project description, etc.)
+val publishProperties = Properties().apply {
+    load(file("publish.properties").inputStream())
+}
+
+// Check if we’re on GitHub Actions
+val isGithubActions = System.getenv("GITHUB_ACTIONS") == "true"
+
+version = System.getenv("VERSION") ?:
+        if (isGithubActions)
+            error("VERSION must be set for GitHub Actions")
+        else
+            "0.0.0-LOCAL"
+
+// TODO use Dokka and fix this
+val javadocJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("javadoc")
+}
+
+plugins.withType<MavenPublishPlugin>().configureEach {
+    /* Publish locally to the 'build/repository' folder. Can be useful to check publication issues locally */
+    extensions.configure<PublishingExtension> {
+        /* Publish to GitHub packages */
+        repositories {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/schott12521/compose-cupertino")
+                credentials {
+                    username = System.getenv("GITHUB_ACTOR")
+                    password = System.getenv("GITHUB_TOKEN")
+                }
             }
         }
     }
 }
 
+mavenPublishing {
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, automaticRelease = true)
 
-val publishProperties = Properties().apply {
-    load(file("publish.properties").inputStream())
-}
+    coordinates(project.group as String, project.name, project.version as String)
+    configure(
+        KotlinMultiplatform(
+            javadocJar = JavadocJar.Empty(),
+            sourcesJar = true,
+        )
+    )
 
-val javadocJar by tasks.registering(Jar::class) {
-    archiveClassifier.set("javadoc")
-}
+    if (isGithubActions)
+        signAllPublications()
 
-publishing.publications.withType<MavenPublication> {
-    artifact(javadocJar.get())
     pom {
         name.set(project.name)
         description.set(publishProperties.getProperty("description"))
-        url.set("https://github.com/schott12521/ExampleLibrary")
+        url.set("https://github.com/schott12521/TODO-CHANGE")
 
         licenses {
             license {

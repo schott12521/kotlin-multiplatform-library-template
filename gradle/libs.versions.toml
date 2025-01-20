@@ -6,6 +6,7 @@ androidx-activityCompose = "1.9.3"
 datetime = "0.6.1"
 serialization="1.7.3"
 jetbrainsCompose="1.7.1"
+vanniktech-mavenPublish="0.30.0"
 
 [libraries]
 gradle = { module = "com.android.tools.build:gradle", version.ref = "gradle" }
@@ -13,6 +14,7 @@ kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", v
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
 serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+vanniktech-maven-publish-gradle-plugin = { module = "com.vanniktech.maven.publish:com.vanniktech.maven.publish.gradle.plugin", version.ref = "vanniktech-mavenPublish" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
